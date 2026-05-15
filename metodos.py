@@ -3,7 +3,7 @@ import pandas as pd
 import sympy as sp
 
 # ==========================================
-# 1. ECUACIONES NO LINEALES (Lógica Flexible)
+# 1. ECUACIONES NO LINEALES (Tres Errores)
 # ==========================================
 
 def biseccion(f, a, b, tol, max_iter):
@@ -14,23 +14,16 @@ def biseccion(f, a, b, tol, max_iter):
         fxm = f(xm)
         e_abs = abs(xm - x_ant)
         e_rel = e_abs / abs(xm) if xm != 0 else e_abs
+        e_cond = abs(fxm)  # Error de condición / residuo
         
         iteraciones.append({
-            "Iter": i + 1, 
-            "x_n": xm, 
-            "f(x)": fxm, 
-            "E_Abs": e_abs, 
-            "E_Rel": e_rel
+            "Iter": i + 1, "x_n": xm, "f(x)": fxm, 
+            "E_Abs": e_abs, "E_Rel": e_rel, "E_Cond": e_cond
         })
+        if i > 0 and e_rel < tol: break
         
-        if i > 0 and e_rel < tol: 
-            break
-        
-        # Lógica de decisión de intervalo (Flexible: corre aunque no haya cambio de signo)
-        if f(a) * fxm < 0:
-            b = xm
-        else:
-            a = xm
+        if f(a) * fxm < 0: b = xm
+        else: a = xm
         x_ant = xm
     return pd.DataFrame(iteraciones)
 
@@ -39,28 +32,21 @@ def regla_falsa(f, a, b, tol, max_iter):
     x_ant = a
     for i in range(max_iter):
         fa, fb = f(a), f(b)
-        # Evitar división por cero si f(a) == f(b)
         if fb - fa == 0: break
-        
         xm = b - (fb * (b - a)) / (fb - fa)
         fxm = f(xm)
         e_abs = abs(xm - x_ant)
         e_rel = e_abs / abs(xm) if xm != 0 else e_abs
+        e_cond = abs(fxm)
         
         iteraciones.append({
-            "Iter": i + 1, 
-            "x_n": xm, 
-            "f(x)": fxm, 
-            "E_Abs": e_abs, 
-            "E_Rel": e_rel
+            "Iter": i + 1, "x_n": xm, "f(x)": fxm, 
+            "E_Abs": e_abs, "E_Rel": e_rel, "E_Cond": e_cond
         })
-        
         if i > 0 and e_rel < tol: break
         
-        if fa * fxm < 0:
-            b = xm
-        else:
-            a = xm
+        if fa * fxm < 0: b = xm
+        else: a = xm
         x_ant = xm
     return pd.DataFrame(iteraciones)
 
@@ -68,12 +54,18 @@ def punto_fijo(g, x0, tol, max_iter):
     iteraciones = []
     x_ant = x0
     for i in range(max_iter):
-        xn = g(x_ant)
+        try:
+            xn = g(x_ant)
+        except:
+            break
         e_abs = abs(xn - x_ant)
         e_rel = e_abs / abs(xn) if xn != 0 else e_abs
+        e_cond = e_abs # En punto fijo no hay f(x) directa, el residuo es |x_n - g(x_n)|
         
-        iteraciones.append({"Iter": i + 1, "x_n": xn, "E_Rel": e_rel})
-        
+        iteraciones.append({
+            "Iter": i + 1, "x_n": xn, "f(x)": xn - x_ant, 
+            "E_Abs": e_abs, "E_Rel": e_rel, "E_Cond": e_cond
+        })
         if e_rel < tol: break
         x_ant = xn
     return pd.DataFrame(iteraciones)
@@ -84,13 +76,16 @@ def newton(f, df, x0, tol, max_iter):
     for i in range(max_iter):
         derivada = df(x_ant)
         if derivada == 0: break
-        
         xn = x_ant - f(x_ant) / derivada
+        fxn = f(xn)
         e_abs = abs(xn - x_ant)
         e_rel = e_abs / abs(xn) if xn != 0 else e_abs
+        e_cond = abs(fxn)
         
-        iteraciones.append({"Iter": i + 1, "x_n": xn, "f(x)": f(xn), "E_Rel": e_rel})
-        
+        iteraciones.append({
+            "Iter": i + 1, "x_n": xn, "f(x)": fxn, 
+            "E_Abs": e_abs, "E_Rel": e_rel, "E_Cond": e_cond
+        })
         if e_rel < tol: break
         x_ant = xn
     return pd.DataFrame(iteraciones)
@@ -100,12 +95,16 @@ def secante(f, x0, x1, tol, max_iter):
     for i in range(max_iter):
         f0, f1 = f(x0), f(x1)
         if f1 - f0 == 0: break
-        
         xn = x1 - (f1 * (x1 - x0)) / (f1 - f0)
-        e_rel = abs(xn - x1) / abs(xn) if xn != 0 else abs(xn - x1)
+        fxn = f(xn)
+        e_abs = abs(xn - x1)
+        e_rel = e_abs / abs(xn) if xn != 0 else e_abs
+        e_cond = abs(fxn)
         
-        iteraciones.append({"Iter": i + 1, "x_n": xn, "f(x)": f(xn), "E_Rel": e_rel})
-        
+        iteraciones.append({
+            "Iter": i + 1, "x_n": xn, "f(x)": fxn, 
+            "E_Abs": e_abs, "E_Rel": e_rel, "E_Cond": e_cond
+        })
         if e_rel < tol: break
         x0, x1 = x1, xn
     return pd.DataFrame(iteraciones)
@@ -114,22 +113,31 @@ def raices_multiples(f, df, ddf, x0, tol, max_iter):
     iteraciones = []
     x_ant = x0
     for i in range(max_iter):
-        fv, dfv, ddfv = f(x_ant), df(x_ant), ddf(x_ant)
-        denominador = (dfv**2) - (fv * ddfv)
+        fx, dfx, ddfx = f(x_ant), df(x_ant), ddf(x_ant)
+        denominador = (dfx**2) - (fx * ddfx)
         if denominador == 0: break
+        xn = x_ant - (fx * dfx) / denominador
+        fxn = f(xn)
+        e_abs = abs(xn - x_ant)
+        e_rel = e_abs / abs(xn) if xn != 0 else e_abs
+        e_cond = abs(fxn)
         
-        xn = x_ant - (fv * dfv) / denominador
-        e_rel = abs(xn - x_ant) / abs(xn) if xn != 0 else abs(xn - x_ant)
-        
-        iteraciones.append({"Iter": i + 1, "x_n": xn, "f(x)": f(xn), "E_Rel": e_rel})
-        
+        iteraciones.append({
+            "Iter": i + 1, "x_n": xn, "f(x)": fxn, 
+            "E_Abs": e_abs, "E_Rel": e_rel, "E_Cond": e_cond
+        })
         if e_rel < tol: break
         x_ant = xn
     return pd.DataFrame(iteraciones)
-
 # ==========================================
 # 2. SISTEMAS LINEALES
 # ==========================================
+
+def calcular_radio_espectral(T):
+    """Calcula el radio espectral de una matriz (máximo valor propio en módulo)"""
+    valores_propios = np.linalg.eigvals(T)
+    radio = max(abs(valores_propios))
+    return radio
 
 def jacobi(A, b, x0, tol, max_iter):
     D = np.diag(np.diag(A))
@@ -137,6 +145,8 @@ def jacobi(A, b, x0, tol, max_iter):
     U = -np.triu(A, 1)
     T = np.linalg.inv(D) @ (L + U)
     C = np.linalg.inv(D) @ b
+    
+    radio_espectral = calcular_radio_espectral(T)   
     
     iteraciones = []
     x_ant = x0
@@ -146,7 +156,7 @@ def jacobi(A, b, x0, tol, max_iter):
         iteraciones.append({"Iter": i+1, "E_Rel": e_rel})
         if e_rel < tol: break
         x_ant = xn
-    return xn, pd.DataFrame(iteraciones)
+    return xn, pd.DataFrame(iteraciones), T, radio_espectral
 
 def gauss_seidel(A, b, x0, tol, max_iter):
     D = np.diag(np.diag(A))
@@ -163,7 +173,7 @@ def gauss_seidel(A, b, x0, tol, max_iter):
         iteraciones.append({"Iter": i+1, "E_Rel": e_rel})
         if e_rel < tol: break
         x_ant = xn
-    return xn, pd.DataFrame(iteraciones)
+    return xn, pd.DataFrame(iteraciones), T, calcular_radio_espectral(T)
 
 def sor(A, b, x0, tol, max_iter, w):
     D = np.diag(np.diag(A))
@@ -180,19 +190,23 @@ def sor(A, b, x0, tol, max_iter, w):
         iteraciones.append({"Iter": i+1, "E_Rel": e_rel})
         if e_rel < tol: break
         x_ant = xn
-    return xn, pd.DataFrame(iteraciones)
+    return xn, pd.DataFrame(iteraciones), T, calcular_radio_espectral(T)
 
 # ==========================================
-# 3. INTERPOLACIÓN (Retornando SymPy)
+# 3. INTERPOLACIÓN Y ANÁLISIS DE ERROR
 # ==========================================
+from scipy.interpolate import CubicSpline, interp1d
 
 def vandermonde(x_puntos, y_puntos):
-    n = len(x_puntos)
-    A = np.vander(x_puntos, increasing=True)
-    coefs = np.linalg.solve(A, y_puntos)
+    x = np.array(x_puntos, dtype=float)
+    y = np.array(y_puntos, dtype=float)
+    n = len(x)
+    V = np.vander(x, increasing=True)
+    coefs = np.linalg.solve(V, y)
+    
     t = sp.Symbol('x')
-    polinomio = sum(coefs[i] * t**i for i in range(n))
-    return sp.expand(polinomio)
+    polinomio = sum(coefs[i] * (t**i) for i in range(n))
+    return sp.simplify(polinomio)
 
 def lagrange(x_puntos, y_puntos):
     t = sp.Symbol('x')
@@ -223,20 +237,39 @@ def newton_interpolante(x_puntos, y_puntos):
         polinomio += coefs[i] * acumulado
     return sp.simplify(polinomio)
 
-def spline_cubico(x_puntos, y_puntos):
-    from scipy.interpolate import CubicSpline
-    import sympy as sp
+def spline_lineal(x_puntos, y_puntos):
     x = np.array(x_puntos, dtype=float)
     y = np.array(y_puntos, dtype=float)
     idx = np.argsort(x)
     x, y = x[idx], y[idx]
+    
+    # Modelo numérico ejecutable
+    f_interp = interp1d(x, y, kind='linear', fill_value="extrapolate")
+    
+    # Construcción de ecuaciones por tramos para mostrar en LaTeX
+    tramos_txt = []
+    for i in range(len(x) - 1):
+        m = (y[i+1] - y[i]) / (x[i+1] - x[i])
+        b = y[i] - m * x[i]
+        t = sp.Symbol('x')
+        eq = sp.simplify(m*t + b)
+        tramos_txt.append(f"x \\in [{x[i]}, {x[i+1]}]: {sp.latex(eq)}")
+        
+    return f_interp, tramos_txt
+
+def spline_cubico(x_puntos, y_puntos):
+    x = np.array(x_puntos, dtype=float)
+    y = np.array(y_puntos, dtype=float)
+    idx = np.argsort(x)
+    x, y = x[idx], y[idx]
+    
     cs = CubicSpline(x, y, bc_type='not-a-knot')
     
-    # Generar representación en texto por tramos
     t = sp.Symbol('x')
-    tramos = []
+    tramos_txt = []
     for i in range(len(x) - 1):
         a, b, c, d = cs.c[:, i]
         p = sp.simplify(a*(t - x[i])**3 + b*(t - x[i])**2 + c*(t - x[i]) + d)
-        tramos.append(f"x \in [{x[i]}, {x[i+1]}]: {sp.latex(p)}")
-    return cs, tramos
+        tramos_txt.append(f"x \\in [{x[i]}, {x[i+1]}]: {sp.latex(p)}")
+        
+    return cs, tramos_txt
