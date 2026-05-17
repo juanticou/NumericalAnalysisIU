@@ -75,7 +75,14 @@ def newton(f, df, x0, tol, max_iter):
     x_ant = x0
     for i in range(max_iter):
         derivada = df(x_ant)
-        if derivada == 0: break
+        
+        # ⚠️ ALERTA: Validación de la derivada cercana a cero
+        if abs(derivada) < 1e-12:
+            raise ValueError(
+                f"La derivada f'(x) se aproximó críticamente a cero ({derivada:.2e}) en x = {x_ant:.6f} (Iteración {i+1}). "
+                f"El método no puede continuar porque divergerá o generará una división por cero."
+            )
+            
         xn = x_ant - f(x_ant) / derivada
         fxn = f(xn)
         e_abs = abs(xn - x_ant)
@@ -153,7 +160,10 @@ def jacobi(A, b, x0, tol, max_iter):
     for i in range(max_iter):
         xn = T @ x_ant + C
         e_rel = np.linalg.norm(xn - x_ant, np.inf) / np.linalg.norm(xn, np.inf)
-        iteraciones.append({"Iter": i+1, "E_Rel": e_rel})
+        e_abs = np.linalg.norm(xn - x_ant, np.inf)
+        residuo = b - np.dot(A, xn)
+        e_cond = np.linalg.norm(residuo, np.inf)
+        iteraciones.append({"Iter": i+1, "E_Rel": e_rel, "E_Abs": e_abs, "E_Cond": e_cond})
         if e_rel < tol: break
         x_ant = xn
     return xn, pd.DataFrame(iteraciones), T, radio_espectral
@@ -170,7 +180,11 @@ def gauss_seidel(A, b, x0, tol, max_iter):
     for i in range(max_iter):
         xn = T @ x_ant + C
         e_rel = np.linalg.norm(xn - x_ant, np.inf) / np.linalg.norm(xn, np.inf)
-        iteraciones.append({"Iter": i+1, "E_Rel": e_rel})
+        e_abs = np.linalg.norm(xn - x_ant, np.inf)
+        residuo = b - np.dot(A, xn)
+        e_cond = np.linalg.norm(residuo, np.inf)
+        iteraciones.append({"Iter": i+1, "E_Rel": e_rel, "E_Abs": e_abs, "E_Cond": e_cond})
+        
         if e_rel < tol: break
         x_ant = xn
     return xn, pd.DataFrame(iteraciones), T, calcular_radio_espectral(T)
@@ -186,8 +200,19 @@ def sor(A, b, x0, tol, max_iter, w):
     x_ant = x0
     for i in range(max_iter):
         xn = T @ x_ant + C
-        e_rel = np.linalg.norm(xn - x_ant, np.inf) / np.linalg.norm(xn, np.inf)
-        iteraciones.append({"Iter": i+1, "E_Rel": e_rel})
+        # (Esto va dentro del ciclo iterativo de tus funciones en metodos.py)
+    
+        e_abs = np.linalg.norm(xn - x_ant, np.inf) 
+        norm_new = np.linalg.norm(xn, np.inf)
+        e_rel = e_abs / norm_new if norm_new != 0 else e_abs
+        
+        # 2. NUEVO: Error de Condición (Norma del Residuo)
+        # Ax_n se calcula multiplicando la matriz original A por tu x actual
+        residuo = b - np.dot(A, xn)
+        e_cond = np.linalg.norm(residuo, np.inf)
+        
+        # 3. Guardar los TRES en la fila
+        iteraciones.append({"Iter": i + 1, "E_Abs": e_abs, "E_Rel": e_rel, "E_Cond": e_cond})
         if e_rel < tol: break
         x_ant = xn
     return xn, pd.DataFrame(iteraciones), T, calcular_radio_espectral(T)
