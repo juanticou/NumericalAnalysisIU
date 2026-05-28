@@ -24,7 +24,7 @@ categoria = st.sidebar.selectbox("Categoría", ["Ecuaciones No Lineales", "Siste
 menus = {
     "Ecuaciones No Lineales": ["Bisección", "Regla Falsa", "Punto Fijo", "Newton", "Secante", "Raíces Múltiples"],
     "Sistemas Lineales": ["Jacobi", "Gauss-Seidel", "SOR"],
-    "Interpolación": ["Vandermonde", "Lagrange", "Newton Interpolante", "Spline Cubico"]
+    "Interpolación": ["Vandermonde", "Lagrange", "Newton Interpolante", "Spline Lineal", "Spline Cubico"]
 }
 
 metodo = st.sidebar.selectbox("Método", menus[categoria])
